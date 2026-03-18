@@ -30,7 +30,7 @@ async function run() {
 
     const database = client.db(process.env.DB_NAME);
     const productsCollection = database.collection("products");
-    const bestSellerCollection = database.collection("bestSeller");
+    const bestSellerCollection = database.collection("bestSellers");
 
     // GET ALL PRODUCTS
     app.get("/products", async (req, res) => {
@@ -48,6 +48,33 @@ async function run() {
         res.status(500).send({ error: "Failed to fetch products" });
       }
     });
+
+    // GET all best sellers
+    app.get("/api/bestSellers", async (req, res) => {
+      try {
+        const products = await bestSellerCollection.find().toArray();
+        res.json(products);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+    // GET a single product by ID
+    // app.get("/api/bestSellers/:id", async (req, res) => {
+    //   try {
+    //     const { id } = req.params;
+    //     const product = await bestSellerCollection.findOne({
+    //       _id: new ObjectId(id),
+    //     });
+    //     if (!product)
+    //       return res.status(404).json({ error: "Product not found" });
+    //     res.json(product);
+    //   } catch (err) {
+    //     console.error(err);
+    //     res.status(500).json({ error: "Internal server error" });
+    //   }
+    // });
 
     // GET SINGLE PRODUCT BY ID
     app.get("/api/products/:id", async (req, res) => {
