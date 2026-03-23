@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,7 +31,9 @@ async function run() {
     const database = client.db(process.env.DB_NAME);
     const productsCollection = database.collection("products");
     const bestSellerCollection = database.collection("bestSellers");
-
+    const reviewsCollection = database.collection("reviews");
+    const cartCollection = database.collection("cart");
+    const blogsCollection = database.collection("blog");
     // GET ALL PRODUCTS
     app.get("/products", async (req, res) => {
       try {
@@ -49,32 +51,66 @@ async function run() {
       }
     });
 
-    // GET all best sellers
+    // --- GET ALL BEST SELLERS ---
+
     app.get("/api/bestSellers", async (req, res) => {
       try {
-        const products = await bestSellerCollection.find().toArray();
-        res.json(products);
+        const result = await bestSellerCollection.find().toArray();
+        res.send(result);
       } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).send({ message: "Failed to fetch products" });
       }
     });
 
-    // GET a single product by ID
-    // app.get("/api/bestSellers/:id", async (req, res) => {
-    //   try {
-    //     const { id } = req.params;
-    //     const product = await bestSellerCollection.findOne({
-    //       _id: new ObjectId(id),
-    //     });
-    //     if (!product)
-    //       return res.status(404).json({ error: "Product not found" });
-    //     res.json(product);
-    //   } catch (err) {
-    //     console.error(err);
-    //     res.status(500).json({ error: "Internal server error" });
-    //   }
-    // });
+    //  GET SINGLE PRODUCT
+    app.get("/api/bestSellers/:id", async (req, res) => {
+      const { id } = req.params;
+
+      try {
+        const product = await bestSellerCollection.findOne({
+          _id: id,
+        });
+
+        if (!product) {
+          return res.status(404).send({ message: "Product not found" });
+        }
+
+        res.send(product);
+      } catch (err) {
+        console.error("Error fetching product:", err);
+        res.status(500).send({ message: "Server error" });
+      }
+    });
+
+    //  GET REVIEWS BY PRODUCT ID
+    app.get("/api/reviews/:id", async (req, res) => {
+      const { id } = req.params;
+
+      try {
+        const reviews = await reviewsCollection
+          .find({ productId: id })
+          .sort({ date: -1 })
+          .toArray();
+
+        res.send(reviews);
+      } catch (err) {
+        console.error("Error fetching reviews:", err);
+        res.status(500).send({ message: "Failed to fetch reviews" });
+      }
+    });
+
+    //  POST REVIEW
+    app.post("/api/reviews", async (req, res) => {
+      const review = req.body;
+
+      try {
+        const result = await reviewsCollection.insertOne(review);
+        res.send(result);
+      } catch (err) {
+        console.error("Error posting review:", err);
+        res.status(500).send({ message: "Failed to add review" });
+      }
+    });
 
     // GET SINGLE PRODUCT BY ID
     app.get("/api/products/:id", async (req, res) => {
@@ -108,9 +144,7 @@ async function run() {
       }
     });
 
-    // ============================
     //  UPDATE PRODUCT (PUT)
-    // ============================
     app.put("/products/:id", async (req, res) => {
       try {
         const id = parseInt(req.params.id);
@@ -129,9 +163,7 @@ async function run() {
       }
     });
 
-    // ============================
     //  DELETE PRODUCT
-    // ============================
     app.delete("/products/:id", async (req, res) => {
       try {
         const id = parseInt(req.params.id);
@@ -147,7 +179,63 @@ async function run() {
     console.error(" MongoDB connection error:", err);
   }
 }
+app.post("/api/cart", async (req, res) => {
+  const item = req.body;
 
+  const exists = await cartCollection.findOne({
+    productId: item.productId,
+  });
+
+  if (exists) {
+    await cartCollection.updateOne(
+      { productId: item.productId },
+      { $inc: { quantity: item.quantity } },
+    );
+  } else {
+    await cartCollection.insertOne(item);
+  }
+
+  res.send({ success: true });
+});
+app.get("/api/cart", async (req, res) => {
+  const result = await cartCollection.find().toArray();
+  res.send(result);
+});
+app.patch("/api/cart/:id", async (req, res) => {
+  const id = req.params.id;
+  const { type } = req.body;
+
+  const update =
+    type === "inc" ? { $inc: { quantity: 1 } } : { $inc: { quantity: -1 } };
+
+  await cartCollection.updateOne({ _id: new ObjectId(id) }, update);
+
+  res.send({ success: true });
+});
+
+// GET all blogs
+app.get("/api/blogs", async (req, res) => {
+  try {
+    const blogs = await blogsCollection.find().toArray();
+    res.send(blogs);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: "Failed to fetch blogs" });
+  }
+});
+
+// GET single blog by id
+app.get("/api/blogs/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const blog = await blogsCollection.findOne({ _id: new ObjectId(id) });
+    if (!blog) return res.status(404).send({ error: "Blog not found" });
+    res.send(blog);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: "Failed to fetch blog" });
+  }
+});
 run().catch(console.dir);
 
 // ROOT ROUTE
