@@ -34,6 +34,8 @@ async function run() {
     const reviewsCollection = database.collection("reviews");
     const cartCollection = database.collection("cart");
     const blogsCollection = database.collection("blog");
+    const commentsCollection = database.collection("comments");
+
     // GET ALL PRODUCTS
     app.get("/products", async (req, res) => {
       try {
@@ -48,6 +50,65 @@ async function run() {
         res.status(200).send(products);
       } catch (error) {
         res.status(500).send({ error: "Failed to fetch products" });
+      }
+    });
+    // GET all blogs
+    app.get("/api/blogs", async (req, res) => {
+      try {
+        const blogs = await blogsCollection.find().toArray();
+        res.send(blogs);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to fetch blogs" });
+      }
+    });
+
+    // GET single blog by id
+    app.get("/api/blogs/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const blog = await blogsCollection.findOne({ _id: new ObjectId(id) });
+        if (!blog) return res.status(404).send({ error: "Blog not found" });
+        res.send(blog);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to fetch blog" });
+      }
+    });
+    // GET comments
+    app.get("/api/blogs/:id/comments", async (req, res) => {
+      try {
+        const blogId = req.params.id;
+        const comments = await commentsCollection
+          .find({ blogId })
+          .sort({ date: -1 })
+          .toArray();
+        res.send(comments);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to fetch comments" });
+      }
+    });
+
+    // POST comment for a blog
+    app.post("/api/blogs/:id/comments", async (req, res) => {
+      try {
+        const blogId = req.params.id;
+        const { name, email, message } = req.body;
+
+        const comment = {
+          blogId,
+          name,
+          email,
+          message,
+          date: new Date(),
+        };
+
+        const result = await commentsCollection.insertOne(comment);
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to post comment" });
       }
     });
 
@@ -213,29 +274,6 @@ app.patch("/api/cart/:id", async (req, res) => {
   res.send({ success: true });
 });
 
-// GET all blogs
-app.get("/api/blogs", async (req, res) => {
-  try {
-    const blogs = await blogsCollection.find().toArray();
-    res.send(blogs);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: "Failed to fetch blogs" });
-  }
-});
-
-// GET single blog by id
-app.get("/api/blogs/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const blog = await blogsCollection.findOne({ _id: new ObjectId(id) });
-    if (!blog) return res.status(404).send({ error: "Blog not found" });
-    res.send(blog);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: "Failed to fetch blog" });
-  }
-});
 run().catch(console.dir);
 
 // ROOT ROUTE
